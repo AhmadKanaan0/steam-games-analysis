@@ -36,6 +36,7 @@ Data quality issues found in the raw file (all handled during parsing):
 - Some rows store `genres`/`categories` as lists of `{id, description}` objects instead of plain name strings — normalized by extracting `description`.
 - ~23.5K rows store `tags` as a dict of tag name → vote count instead of a list — normalized by taking the dict keys (vote counts discarded, since the majority of rows don't carry them).
 - `windows`/`mac`/`linux` contain NaN alongside True/False — filled with False and cast to bool.
+- `estimated_owners` encodes the same bucket range in two different string formats (e.g. `"20000 - 50000"` vs `"20,000 .. 50,000"`), fragmenting 14 real categories into 26 — normalized via regex extraction of the two numeric bounds into one canonical `"{low} - {high}"` label.
 
 ## EDA (in notebook)
 - Distributions: price, genres, tags, platform support, release timing
@@ -44,7 +45,7 @@ Data quality issues found in the raw file (all handled during parsing):
 - 4-6 sharpest charts selected for the narrative (e.g. "which genres have the best owners-per-game odds", "does going free-to-play change the owners distribution")
 
 ## Model
-- **Target:** `estimated_owners` — the dataset's existing bucketed string ranges (e.g. `"0 - 20000"`), used directly as multiclass classification labels
+- **Target:** `estimated_owners`, normalized to 14 canonical bucketed string ranges (e.g. `"0 - 20000"`), used as multiclass classification labels. The distribution is heavily imbalanced (66.47% of games fall in the lowest bucket, 15.18% have zero recorded owners, the rarest bucket holds 4 games) — evaluation uses class-aware metrics (e.g. per-class F1) rather than raw accuracy, since a majority-class-only classifier would otherwise look deceptively good.
 - **Features:** price, price_bucket, genres (multi-hot or top-N encoded), tags (multi-hot top-N), categories, platform_count, dlc_count, has_achievements, description_length, language_count, release_year, release_month
 - **Explicitly excluded from features (leakage):** `positive`, `negative`, `recommendations`, `peak_ccu`, `user_score`, `metacritic_score`, all `*_playtime_*` columns — these are post-launch outcomes correlated with owners, not pre-launch predictors. This is the key modeling lesson of the project: a model trained on these would look great and mean nothing.
 - **Algorithm:** `HistGradientBoostingClassifier` (scikit-learn) — handles mixed numeric/categorical features well, no heavy tuning needed, no extra dependency beyond sklearn
