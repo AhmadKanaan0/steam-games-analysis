@@ -11,7 +11,7 @@ Learning mode: the user is building this themselves with guidance (some pandas/p
 
 ## Deliverables
 1. `notebook/steam_analysis.ipynb` — the main artifact: data cleaning, EDA, feature engineering, model training/evaluation, narrative
-2. `data/processed/games_part_*.csv` — cleaned, feature-engineered dataset, row-chunked into files under GitHub's ~100MB limit, committed to the repo
+2. `data/processed/games.parquet` — cleaned, feature-engineered dataset, committed to the repo. Parquet compression brings 927MB of raw CSV down to ~32MB, so no chunking is needed (the originally planned `games_part_*` split was dropped as unnecessary).
 3. `models/owners_classifier.pkl` — trained model artifact
 4. `app/streamlit_app.py` — Streamlit dashboard (EDA tab + prediction tab), deployed to Streamlit Community Cloud from the repo
 
@@ -29,7 +29,13 @@ Engineered features:
 - `release_year`, `release_month`
 - `positive_ratio` = positive / (positive + negative) — EDA/target-adjacent, **not** used as a model input feature (see leakage note below)
 
-Output: cleaned + engineered table, split into ~90MB row chunks, saved as CSV under `data/processed/`. The notebook includes a small loader helper that concatenates the chunks back into one DataFrame.
+Output: cleaned + engineered table saved as a single Parquet file at `data/processed/games.parquet` (~32MB). Parquet preserves the parsed list columns natively, so no re-parsing is needed on load.
+
+Data quality issues found in the raw file (all handled during parsing):
+- Some rows store a single value as a bare string instead of a JSON array (e.g. `supported_languages` = `English`) — parser falls back to wrapping it in a list.
+- Some rows store `genres`/`categories` as lists of `{id, description}` objects instead of plain name strings — normalized by extracting `description`.
+- ~23.5K rows store `tags` as a dict of tag name → vote count instead of a list — normalized by taking the dict keys (vote counts discarded, since the majority of rows don't carry them).
+- `windows`/`mac`/`linux` contain NaN alongside True/False — filled with False and cast to bool.
 
 ## EDA (in notebook)
 - Distributions: price, genres, tags, platform support, release timing
