@@ -6,17 +6,45 @@
 
 ## Steps
 
-1. **Environment setup** — venv, install pandas/matplotlib/scikit-learn/jupyter/streamlit, verify notebook runs
-2. **Load & inspect raw data** — read `steam_games.csv`, check shape/dtypes/nulls, understand what we're working with
-3. **Clean & engineer features** — drop unneeded columns, parse list-string columns, build engineered features (tag_count, platform_count, price_bucket, etc.)
-4. **Export processed data** — chunk into `data/processed/games_part_*.csv` under GitHub's size limit
-5. **EDA** — build the 4-6 storytelling charts (price/genre/owners relationships)
-6. **Feature matrix for modeling** — encode categorical/multi-label features, explicit leakage exclusions
-7. **Train baseline model** — `HistGradientBoostingClassifier` on owners bucket
-8. **Evaluate & interpret** — classification report, confusion matrix, permutation importance
-9. **Save model artifact** — `models/owners_classifier.pkl`
-10. **Streamlit app — Explore tab** — reload processed data, interactive EDA charts
-11. **Streamlit app — Predict tab** — form inputs → load model → prediction + probabilities
-12. **Deploy to Streamlit Community Cloud**
+- [x] 1. **Environment setup** — venv at `.venv`, pandas/matplotlib/seaborn/scikit-learn/jupyter/streamlit installed. Note: run Python via `py` (the `python` alias hits a Windows Store stub), and VS Code must use the `.venv` interpreter.
+- [x] 2. **Load & inspect raw data** — 139,580 games × 32 columns after dropping unused text/URL columns via `usecols`.
+- [x] 3. **Clean & engineer features** — parsed list columns, engineered counts, `platform_count`, `price_bucket`, `release_year`/`month`, `description_length`, `positive_ratio`.
+- [x] 4. **Export processed data** — single `data/processed/games.parquet` (~32MB); chunking proved unnecessary.
+- [x] 5. **EDA** — notebook sections 7-12: genre/tag/platform distributions, price vs owners, counts vs owners, free vs paid, release-year trends.
+- [x] 6. **Feature matrix + leakage audit** — sections 13-14, 21.
+- [x] 7. **Train models** — sections 16-20: baseline, class-weighted, feature-rich, `release_year` variant, leak-free variants.
+- [x] 8. **Evaluate & interpret** — classification reports, confusion matrix, off-by-N ordinal metrics, permutation importance.
+- [x] 9. **Save model artifact** — `models/owners_classifier.joblib` (both models + vocabularies + metrics).
+- [ ] 10. **Streamlit app — Explore tab** — reload processed parquet, interactive EDA charts with genre/price/year filters.
+- [ ] 11. **Streamlit app — Predict tab** — form inputs → **both** models' predictions side by side, with the train/serve mismatch explained (user's explicit choice).
+- [ ] 12. **Deploy to Streamlit Community Cloud** — needs the repo public (it is: github.com/AhmadKanaan0/steam-games-analysis).
 
 Each step: user writes the code, Claude explains reasoning/reviews, commit when it runs.
+
+## Key findings so far (for resuming context)
+
+**Seven data-quality issues found**, five of them schema inconsistencies fixed during parsing, two documented as limitations:
+1. bare strings instead of JSON arrays (`supported_languages`)
+2. `{id, description}` objects instead of genre/category names
+3. `tags` as a name→vote-count dict (~23.5K rows)
+4. NaN mixed into boolean platform columns
+5. `estimated_owners` encoded in two formats, fragmenting 14 buckets into 26
+6. `tags_count` hard-capped at 20 (33,494 games pile up there) — collection artifact
+7. `price_status = "unavailable"` (4,230 games) — two hypotheses tested and ruled out; unresolved, likely a scrape artifact
+
+**Also unresolved:** 2025's share of lowest-bucket games (55.3%) sits below 2024's (66.6%), backwards for maturity bias. `steam_spy_available` was checked and is constant, so uninformative. Documented as an open question.
+
+**Modelling results** (9 classes after dropping `0 - 0` and merging the five smallest buckets):
+
+| Model | Features | Accuracy | Macro F1 | Within 1 bucket |
+| --- | --- | --- | --- | --- |
+| unweighted baseline | 11 | 0.783 | 0.140 | — |
+| class-weighted | 11 | 0.523 | 0.193 | 0.787 |
+| + genres/tags/categories/publisher | 117 | 0.613 | 0.248 | 0.855 |
+| − leaky counts | 113 | 0.598 | 0.230 | 0.843 |
+| − all tag features (clean) | 53 | 0.565 | 0.193 | 0.796 |
+
+- The unweighted baseline was **worse than a `DummyClassifier`** (0.783 vs 0.784) — the section's centrepiece demonstration that accuracy lies on imbalanced data.
+- **Leakage found after the fact**: `tags_count` was the top feature by 4.6x but is community-generated and accumulates post-launch; `dlc_count` and the language counts fail the same test. ~22% of the best model's macro F1 came from leakage.
+- Dropping `tags_count` alone barely helped because summed tag indicators correlate with it at **0.936** — the leak survives through the indicators.
+- **Train/serve mismatch** identified: the model learned "many tag indicators → popular" from mature catalog entries, so a pre-release game with 4-5 tags would be systematically under-predicted. This is why both models ship.
