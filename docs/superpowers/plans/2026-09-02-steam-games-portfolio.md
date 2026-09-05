@@ -15,9 +15,14 @@
 - [x] 7. **Train models** — sections 16-20: baseline, class-weighted, feature-rich, `release_year` variant, leak-free variants.
 - [x] 8. **Evaluate & interpret** — classification reports, confusion matrix, off-by-N ordinal metrics, permutation importance.
 - [x] 9. **Save model artifact** — `models/owners_classifier.joblib` (both models + vocabularies + metrics).
-- [ ] 10. **Streamlit app — Explore tab** — reload processed parquet, interactive EDA charts with genre/price/year filters.
-- [ ] 11. **Streamlit app — Predict tab** — form inputs → **both** models' predictions side by side, with the train/serve mismatch explained (user's explicit choice).
-- [ ] 12. **Deploy to Streamlit Community Cloud** — needs the repo public (it is: github.com/AhmadKanaan0/steam-games-analysis).
+- [x] 10. **Streamlit app — Explore tab** — `app/streamlit_app.py`. Filters for genre/price/year, four Altair charts, top-games table. Loads only 18 of 46 parquet columns via `read_parquet(columns=...)`, cutting memory from 188MB to 50MB for Streamlit Cloud's ~1GB tier.
+- [x] 11. **Streamlit app — Predict tab** — form → **both** models side by side with probability charts, metrics read from the saved bundle, and the train/serve mismatch explained inline.
+- [ ] 12. **Deploy to Streamlit Community Cloud** — `requirements.txt` is ready (sklearn pinned to 1.9.0 to match the pickled models). Repo is public: github.com/AhmadKanaan0/steam-games-analysis.
+
+### App gotchas found while building
+
+- Streamlit renders markdown, so a **pair of unescaped `$` is parsed as LaTeX math** and silently swallows the text between them. All dollar signs in captions/help text are escaped as `\\$`.
+- matplotlib/seaborn are deliberately **not** in `requirements.txt` — the app uses Altair (which Streamlit ships) instead, for lower memory on the free tier. They remain notebook-only dependencies.
 
 Each step: user writes the code, Claude explains reasoning/reviews, commit when it runs.
 

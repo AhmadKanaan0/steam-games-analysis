@@ -105,6 +105,14 @@ df = pd.read_parquet("data/processed/games.parquet")  # list columns survive int
 
 Steam Games Dataset, from Kaggle. <!-- TODO: add the exact dataset URL --> The quirks documented above are properties of that scrape, not of Steam itself — notably the 20-tag ceiling and the ambiguous `price_status` values, both of which appear to be artifacts of how the data was collected rather than facts about the games.
 
-## Still to come
+## Dashboard
 
-A Streamlit dashboard with an interactive EDA view and a prediction form that shows **both** models side by side — because the higher-scoring model carries a train/serve mismatch (it learned "many tags → popular" from mature catalog entries, so a developer entering the 4-5 tags they plan to launch with would be systematically under-predicted). Showing both makes that trade-off visible rather than hiding it behind one number.
+```bash
+streamlit run app/streamlit_app.py
+```
+
+An **Explore** tab with filters across genre, price and release year, and a **Predict** tab that runs *both* models side by side. Two models rather than the better one, because the higher-scoring model carries a train/serve mismatch: it learned "many tags → popular" from mature catalog entries, so a developer entering the four or five tags they plan to launch with would be systematically under-predicted. Showing both makes that trade-off visible rather than hiding it behind a single number.
+
+The page opens on the whole catalog drawn as one proportional strip — every owners bucket sized by its share of Steam, so the long tail is shown rather than described. Colour encodes magnitude throughout, running from the grey of the tail to oxblood for the handful of games that reach millions.
+
+Not yet deployed. <!-- TODO: add the Streamlit Community Cloud URL once live -->
